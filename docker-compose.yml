@@ -1,0 +1,278 @@
+services:
+  # Seed Node - First cluster member - every node could be a seed - this is important only on start
+  seed-node-a:
+    build: .
+    container_name: pekkopoc-seed-node-a
+    hostname: seed-node-a
+    ports:
+      - "8080:8080"    # HTTP API
+      - "8558:8558"    # Management
+      - "25520:25520"  # Cluster communication
+      - "9095:9095"    # Prometheus metrics
+    environment:
+      - CLUSTER_IP=seed-node-a
+      - CLUSTER_PORT=25520
+      - HTTP_PORT=8080
+      - MANAGEMENT_PORT=8558
+      - NODE_ROLE=seed
+      - SEED_NODES=pekko://ClusterA@seed-node-a:25520
+      - KAMON_SERVICE_NAME=pekko-cluster-service
+      - PEKKO_CLUSTER_NAME=ClusterA
+      - KAFKA_BOOTSTRAP_SERVERS=pekkopoc-kafka:9092
+    networks:
+      - cluster-network
+    restart: unless-stopped
+    depends_on:
+    - kafka-init
+
+  # Worker Node 1
+  node-1:
+    build: .
+    container_name: pekkopoc-node-1
+    hostname: node-1
+    ports:
+      - "8081:8080"    # HTTP API
+      - "8559:8558"    # Management
+      - "25521:25520"  # Cluster communication
+      - "9096:9095"    # Prometheus metrics
+    environment:
+      - CLUSTER_IP=node-1
+      - CLUSTER_PORT=25520
+      - HTTP_PORT=8080
+      - MANAGEMENT_PORT=8558
+      - NODE_ROLE=worker
+      - SEED_NODES=pekko://ClusterA@seed-node-a:25520
+      - KAMON_SERVICE_NAME=pekko-cluster-service
+      - PEKKO_CLUSTER_NAME=ClusterA
+      - KAFKA_BOOTSTRAP_SERVERS=pekkopoc-kafka:9092
+    depends_on:
+      - seed-node-a
+      - kafka-init
+    networks:
+      - cluster-network
+    restart: unless-stopped
+    
+  # Worker Node 2
+  node-2:
+    build: .
+    container_name: pekkopoc-node-2
+    hostname: node-2
+    ports:
+      - "8082:8080"    # HTTP API
+      - "8560:8558"    # Management
+      - "25522:25520"  # Cluster communication
+      - "9097:9095"    # Prometheus metrics
+    environment:
+      - CLUSTER_IP=node-2
+      - CLUSTER_PORT=25520
+      - HTTP_PORT=8080
+      - MANAGEMENT_PORT=8558
+      - NODE_ROLE=worker
+      - SEED_NODES=pekko://ClusterA@seed-node-a:25520
+      - KAMON_SERVICE_NAME=pekko-cluster-service
+      - PEKKO_CLUSTER_NAME=ClusterA
+      - KAFKA_BOOTSTRAP_SERVERS=pekkopoc-kafka:9092
+    depends_on:
+      - seed-node-a
+      - kafka-init
+    networks:
+      - cluster-network
+    restart: unless-stopped
+    
+
+  # Load Balancer (nginx)
+  load-balancer-a:
+    image: nginx:alpine
+    container_name: pekkopoc-nginx-a
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx-a.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - seed-node-a
+      - node-1
+      - node-2
+    networks:
+      - cluster-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  load-balancer-b:
+    image: nginx:alpine
+    container_name: pekkopoc-nginx-b
+    ports:
+      - "8050:80"
+    volumes:
+      - ./nginx-b.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - seed-node-b
+      - node-b1
+      - node-b2
+    networks:
+      - cluster-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3    
+
+  # Cluster B
+  seed-node-b:
+    build: .
+    container_name: pekkopoc-seed-node-b
+    hostname: seed-node-b
+    ports:
+      - "8083:8080"
+      - "8561:8558"
+      - "25530:25530"
+      - "9098:9095"
+    environment:
+      - CLUSTER_IP=seed-node-b
+      - CLUSTER_PORT=25530
+      - HTTP_PORT=8080
+      - MANAGEMENT_PORT=8558
+      - NODE_ROLE=seed
+      - SEED_NODES=pekko://ClusterB@seed-node-b:25530
+      - PEKKO_CLUSTER_NAME=ClusterB
+      - KAFKA_BOOTSTRAP_SERVERS=pekkopoc-kafka:9092
+    networks:
+      - cluster-network
+    restart: unless-stopped
+    depends_on:
+    - kafka-init
+
+  node-b1:
+    build: .
+    container_name: pekkopoc-node-b1
+    hostname: node-b1
+    ports:
+      - "8084:8080"
+      - "8562:8558"
+      - "25531:25530"
+      - "9099:9095"
+    environment:
+      - CLUSTER_IP=node-b1
+      - CLUSTER_PORT=25530
+      - HTTP_PORT=8080
+      - MANAGEMENT_PORT=8558
+      - NODE_ROLE=ops
+      - SEED_NODES=pekko://ClusterB@seed-node-b:25530
+      - PEKKO_CLUSTER_NAME=ClusterB
+      - KAFKA_BOOTSTRAP_SERVERS=pekkopoc-kafka:9092
+    networks:
+      - cluster-network
+    restart: unless-stopped
+    depends_on:
+    - seed-node-b
+    - kafka-init
+
+  node-b2:
+    build: .
+    container_name: pekkopoc-node-b2
+    hostname: node-b2
+    ports:
+      - "8085:8080"
+      - "8563:8558"
+      - "25532:25530"
+      - "9100:9095"
+    environment:
+      - CLUSTER_IP=node-b2
+      - CLUSTER_PORT=25530
+      - HTTP_PORT=8080
+      - MANAGEMENT_PORT=8558
+      - NODE_ROLE=ops
+      - SEED_NODES=pekko://ClusterB@seed-node-b:25530
+      - PEKKO_CLUSTER_NAME=ClusterB
+      - KAFKA_BOOTSTRAP_SERVERS=pekkopoc-kafka:9092
+    networks:
+      - cluster-network
+    restart: unless-stopped
+    depends_on:
+    - seed-node-b
+    - kafka-init
+
+  postgres:
+    image: postgres:15
+    container_name: pekko-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pekko
+      POSTGRES_PASSWORD: pekko
+      POSTGRES_DB: pekko
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-peekko.sql:/docker-entrypoint-initdb.d/init-peekko.sql:ro
+    ports:
+      - "5432:5432"    
+    networks:
+      - cluster-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0  # or another stable version
+    container_name: pekkopoc-kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_ZOOKEEPER_CONNECT: pekkopoc-zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://pekkopoc-kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true" #not for production
+    depends_on:
+      - zookeeper
+    networks:
+      - cluster-network
+    restart: unless-stopped
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+
+  # creating topics on startup
+  # read about Kafka partitioning and consumers groups to understand
+  # why those 12 partitions I specified is nice for the cluster of 3 nodes
+  # to be sure that the partitions are evenly distributed between nodes
+  # and all the messages will be distributed
+  # to corresponding partitions and will be received only ONCE by SOME node.
+  kafka-init:
+    image: confluentinc/cp-kafka:7.4.0
+    depends_on:
+      - kafka
+    entrypoint: ["/bin/sh", "-c"]
+    command: |
+      "
+      # Wait for Kafka to be ready
+      while ! nc -z kafka 9092; do sleep 1; done
+      # Create topics
+      kafka-topics --bootstrap-server pekkopoc-kafka:9092 --create --if-not-exists --topic deployment-requests --partitions 12 --replication-factor 1
+      kafka-topics --bootstrap-server pekkopoc-kafka:9092 --create --if-not-exists --topic deployment-responses --partitions 12 --replication-factor 1
+      "
+    networks:
+      - cluster-network
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: pekkopoc-zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - cluster-network
+    restart: unless-stopped
+    volumes:
+    - zookeeper-data:/var/lib/zookeeper/data 
+
+networks:
+  cluster-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+volumes:
+  postgres_data:
+  kafka-data:
+  zookeeper-data:

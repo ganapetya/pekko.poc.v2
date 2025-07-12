@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Your existing loggers -->
+    <logger name="org.apache.pekko" level="INFO"/>
+    <logger name="org.apache.pekko.cluster" level="INFO"/>
+    <logger name="org.apache.pekko.persistence" level="INFO"/>
+    <logger name="com.example.cluster" level="DEBUG"/>
+
+    <!-- Enhanced sharding and cluster logging -->
+    <logger name="org.apache.pekko.cluster.sharding" level="DEBUG"/>
+    <logger name="org.apache.pekko.cluster.sharding.ShardRegion" level="DEBUG"/>
+    <logger name="org.apache.pekko.cluster.sharding.ShardCoordinator" level="DEBUG"/>
+    <logger name="org.apache.pekko.cluster.sharding.Shard" level="DEBUG"/>
+    <logger name="org.apache.pekko.cluster.sharding.PersistentShardCoordinator" level="DEBUG"/>
+    
+    <!-- Optional: More detailed cluster logging -->
+    <logger name="org.apache.pekko.cluster.ClusterHeartbeat" level="INFO"/>
+    <logger name="org.apache.pekko.cluster.ClusterCoreDaemon" level="INFO"/>
+    <logger name="org.apache.pekko.cluster.MemberStatus" level="INFO"/>
+    
+    <!-- Keep remoting at INFO to avoid too much noise -->
+    <logger name="org.apache.pekko.remote" level="INFO"/>
+
+    <root level="INFO">
+        <appender-ref ref="STDOUT"/>
+    </root>
+</configuration>
